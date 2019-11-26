@@ -99,6 +99,8 @@ int main()
     return -1;
   }
 
+  printf("%ld\n", olen);
+
   for(int idx=0; idx<strlen(buf); printf("%02x", buf[idx++]));
   printf ("\n");
 
