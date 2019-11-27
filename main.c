@@ -15,6 +15,9 @@
 #include <mbedtls/md.h>
 
 
+#define LETTER_INPUT_SIZE 50
+
+
 int create_aes_key(unsigned char* key)
 {
     int ret;
@@ -69,12 +72,13 @@ int main (void)
 {
     // Letter
     cw_pack_context pc_letter;
-    char input[40];
-    char *input_msgpack;
+    cw_pack_context pc_letter_query;
+    char letter_input[LETTER_INPUT_SIZE];
+    char *letter_input_msgpack;
     mbedtls_aes_context aes;
     unsigned char key[32];
     unsigned char iv[16];
-    unsigned char output[40];
+    unsigned char letter_encrypted[LETTER_INPUT_SIZE];
     size_t iv_off;
 
     // Stamp
@@ -100,6 +104,7 @@ int main (void)
     if(create_aes_key(key) == 0 || create_iv(iv) == 0)
         return -1;
     
+    /* --------------------- STAMP --------------------- */
     /* Create the stamp */  
     cw_pack_context_init (&pc_stamp, stamp, 128, 0);
     cw_pack_array_size(&pc_stamp, 5);
@@ -136,31 +141,44 @@ int main (void)
     }
     printf("STAMP ENCRYPTION\n");
 
-    
+    /* --------------------- LETTER --------------------- */
     /* Create the letter */
-    cw_pack_context_init (&pc_letter, input, 40, 0);
-    cw_pack_map_size (&pc_letter, 3);
+    cw_pack_context_init (&pc_letter, letter_input, LETTER_INPUT_SIZE, 0);
+    cw_pack_map_size (&pc_letter, 6);
     cw_pack_str (&pc_letter, "db", 2);
     cw_pack_str (&pc_letter, "test", 4);
     cw_pack_str (&pc_letter, "table", 5);
     cw_pack_str (&pc_letter, "data", 4);
     cw_pack_str (&pc_letter, "user", 4);
     cw_pack_str (&pc_letter, "admin", 5);
+    cw_pack_str (&pc_letter, "pass", 4);
+    cw_pack_str (&pc_letter, "admni", 5);
+    cw_pack_str (&pc_letter, "op", 2);
+    cw_pack_str (&pc_letter, "insert", 6);
+    cw_pack_str (&pc_letter, "query", 5);
     int length = pc_letter.current - pc_letter.start;
 
+
     /* Trim the array with dynamic memory */
-    input_msgpack = (char *)malloc(length);
-    memset(input_msgpack, 0, length * sizeof(char));
-    memcpy(input_msgpack, input, strlen(input));
+    letter_input_msgpack = (char *)malloc(length);
+    memset(letter_input_msgpack, 0, length * sizeof(char));
+    memcpy(letter_input_msgpack, letter_input, length);
 
     printf("LETTER CREATION\n");
 
     /* Letter Encryption */
     mbedtls_aes_setkey_enc(&aes, key, 256);  // Key is 32 Bytes - 32 * 8bits = 256
-    mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, length, &iv_off, iv, input_msgpack, output);
+    mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, length, &iv_off, iv, letter_input_msgpack, letter_encrypted);
+    
     /* Free memory */
-    free(input_msgpack);
+    free(letter_input_msgpack);
+
     printf("LETTER ENCRYPTION\n");
+
+
+
+
+
 
     return 0;
 }

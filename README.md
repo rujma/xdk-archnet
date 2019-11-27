@@ -1,4 +1,4 @@
-Host implementation for communication with Archnet server.
+Host implementation to use Archnet server.
 C implementation.
 
 gcc main.c cwpack.c -o program -lmbedtls -lmbedcrypto
