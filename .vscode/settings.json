@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "pk.h": "c"
+        "pk.h": "c",
+        "config.h": "c"
     }
 }
