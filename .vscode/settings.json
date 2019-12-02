@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "pk.h": "c",
-        "config.h": "c"
+        "config.h": "c",
+        "sha256.h": "c",
+        "cwpack.h": "c"
     }
 }

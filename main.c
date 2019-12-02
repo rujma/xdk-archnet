@@ -14,8 +14,21 @@
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
 
+/* 
+{
+  "db": "test",
+  "table": "data",
+  "user": "admin",
+  "pass": "admin",
+  "op": "insert",
+  "query": {
+            "acc": 90,
+            "hum": 30,
+            }
+}
+*/
 
-#define LETTER_INPUT_SIZE 50
+#define LETTER_INPUT_SIZE 150
 
 
 int create_aes_key(unsigned char* key)
@@ -67,6 +80,8 @@ int create_iv(unsigned char* iv)
     }
     return 1;
 }
+/* TODO: Modulo de parsing the nova public key */
+/* REMINDER: a mensagem de pedido de public key é do tip raw (tipica string) */
 
 int main (void)
 {
@@ -80,7 +95,7 @@ int main (void)
     unsigned char iv[16];
     unsigned char letter_encrypted[LETTER_INPUT_SIZE];
     size_t iv_off;
-
+    char sensor_data_string[70];
     // Stamp
     cw_pack_context pc_stamp;
     mbedtls_pk_context pk;
@@ -96,6 +111,8 @@ int main (void)
                      "E7lW4ZhnsbZMH6DMEQIDAQAB\r\n"
                      "-----END PUBLIC KEY-----\r\n\0";
     const char *pers = "mbedtls_pk_encrypt";
+    unsigned char * message_string;
+    int total_length;
 
     // Auxiliary variables
     FILE * file_ptr;
@@ -107,12 +124,11 @@ int main (void)
     /* --------------------- STAMP --------------------- */
     /* Create the stamp */  
     cw_pack_context_init (&pc_stamp, stamp, 128, 0);
-    cw_pack_array_size(&pc_stamp, 5);
+    cw_pack_array_size(&pc_stamp, 4);
     cw_pack_str(&pc_stamp, key, 32);
     cw_pack_str(&pc_stamp, iv, 16);
     cw_pack_str(&pc_stamp, "microservice1234", 15);
     cw_pack_str(&pc_stamp, "1", 1);
-    cw_pack_str(&pc_stamp, "FILLING MESSAGE WITH TRASH", 26);
     int length_stamp = pc_stamp.current - pc_stamp.start;
     
     //file_ptr = fopen("test_pack.bin", "wb");
@@ -152,33 +168,53 @@ int main (void)
     cw_pack_str (&pc_letter, "user", 4);
     cw_pack_str (&pc_letter, "admin", 5);
     cw_pack_str (&pc_letter, "pass", 4);
-    cw_pack_str (&pc_letter, "admni", 5);
+    cw_pack_str (&pc_letter, "admin", 5);
     cw_pack_str (&pc_letter, "op", 2);
     cw_pack_str (&pc_letter, "insert", 6);
     cw_pack_str (&pc_letter, "query", 5);
+    snprintf(sensor_data_string, 48, "{\n\t\"hum\": %.1lf, \n\t\"temp\": %.1lf, \n\t\"press\": %.1lf\n}", 2.32, 6.24, 32.1123);
+    cw_pack_str (&pc_letter, sensor_data_string, strlen(sensor_data_string));
     int length = pc_letter.current - pc_letter.start;
+
+    //for(int i = 0; i < length; i++)
+    //{
+    //    printf("%x ", (unsigned char)letter_input[i]);
+    //}
+    //printf("\nlength: %d\n", length);
 
 
     /* Trim the array with dynamic memory */
-    letter_input_msgpack = (char *)malloc(length);
-    memset(letter_input_msgpack, 0, length * sizeof(char));
-    memcpy(letter_input_msgpack, letter_input, length);
+    //letter_input_msgpack = (char *)malloc(length);
+    //memset(letter_input_msgpack, 0, length * sizeof(char));
+    //memcpy(letter_input_msgpack, letter_input, length);
 
     printf("LETTER CREATION\n");
 
     /* Letter Encryption */
     mbedtls_aes_setkey_enc(&aes, key, 256);  // Key is 32 Bytes - 32 * 8bits = 256
-    mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, length, &iv_off, iv, letter_input_msgpack, letter_encrypted);
+    mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, length, &iv_off, iv, letter_input, letter_encrypted);
     
     /* Free memory */
-    free(letter_input_msgpack);
+    //free(letter_input_msgpack);
 
     printf("LETTER ENCRYPTION\n");
 
+    total_length = length + 128;
 
+    /* JOIN STAMP ENCRYPTED AND LETTER ENCRYPTED ARRAYS */
+    message_string = (unsigned char *)malloc(total_length);
+    memset(message_string, 0, total_length * sizeof(unsigned char));
+    memcpy(message_string, stamp_encrypted, 128);
+    memcpy(message_string + 128, letter_encrypted, length);
 
+    printf("FINAL ARRAY CREATED \n");
 
-
+    file_ptr = fopen("test_archnet.bin", "wb");
+    fwrite(message_string, sizeof(unsigned char), total_length, file_ptr);
+    fclose(file_ptr);
 
     return 0;
 }
+
+
+/* bin: (stamp+letter) + private key */
